@@ -21,6 +21,7 @@ import groovy.transform.CompileStatic
 import nextflow.Global
 import nextflow.fusion.FusionConfig
 import nextflow.fusion.FusionEnv
+import nextflow.util.AwsUserCredentials
 import org.pf4j.Extension
 /**
  * Implements {@link FusionEnv} for AWS cloud
@@ -38,10 +39,11 @@ class AwsFusionEnv implements FusionEnv {
 
         final result = new HashMap<String,String>()
         final endpoint = Global.getAwsS3Endpoint()
-        final creds = config.exportAwsAccessKeys() ? Global.getAwsCredentials() : Collections.<String>emptyList()
-        if( creds ) {
-            result.AWS_ACCESS_KEY_ID = creds[0]
-            result.AWS_SECRET_ACCESS_KEY = creds[1]
+        final creds = config.exportAwsAccessKeys() ? Global.getAwsCredentials() : null
+        if( creds in AwsUserCredentials ) {
+            def userCredentials = creds as AwsUserCredentials
+            result.AWS_ACCESS_KEY_ID = userCredentials.accessKeyId
+            result.AWS_SECRET_ACCESS_KEY = userCredentials.secretAccessKey
         }
         if( endpoint )
             result.AWS_S3_ENDPOINT = endpoint

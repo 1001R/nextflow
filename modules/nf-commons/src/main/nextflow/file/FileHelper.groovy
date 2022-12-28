@@ -519,16 +519,7 @@ class FileHelper {
         def result = new LinkedHashMap(10)
         if( scheme?.toLowerCase() == 's3' ) {
 
-            List credentials = Global.getAwsCredentials(env)
-            if( credentials ) {
-                // S3FS expect the access - secret keys pair in lower notation
-                result.access_key = credentials[0]
-                result.secret_key = credentials[1]
-                if (credentials.size() == 3) {
-                    result.session_token = credentials[2]
-                    log.debug "Using AWS temporary session token for S3FS."
-                }
-            }
+            result.credentials = Global.getAwsCredentials(env)
 
             // AWS region
             final region = Global.getAwsRegion()
