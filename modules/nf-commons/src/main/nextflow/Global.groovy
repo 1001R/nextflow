@@ -16,6 +16,10 @@
 
 package nextflow
 
+import nextflow.util.AwsProcessCredentials
+import nextflow.util.AwsSessionCredentials
+import nextflow.util.AwsUserCredentials
+
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.util.function.Consumer
@@ -93,7 +97,7 @@ class Global {
      *      {@code null} if the credentials are missing
      */
     @PackageScope
-    static List<String> getAwsCredentials0( Map env, Map config, List<Path> files = []) {
+    static getAwsCredentials0( Map env, Map config, List<Path> files = []) {
 
         String a
         String b
@@ -104,7 +108,7 @@ class Global {
 
             if( a && b ) {
                 log.debug "Using AWS credentials defined in nextflow config file"
-                return [a, b]
+                return new AwsUserCredentials(a, b)
             }
 
         }
@@ -113,12 +117,12 @@ class Global {
         // http://docs.aws.amazon.com/cli/latest/userguide/cli-chap-getting-started.html
         if( env && (a=env.AWS_ACCESS_KEY_ID) && (b=env.AWS_SECRET_ACCESS_KEY) )  {
             log.debug "Using AWS credentials defined by environment variables AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY"
-            return [a, b]
+            return new AwsUserCredentials(a, b)
         }
 
         if( env && (a=env.AWS_ACCESS_KEY) && (b=env.AWS_SECRET_KEY) ) {
             log.debug "Using AWS credentials defined by environment variables AWS_ACCESS_KEY and AWS_SECRET_KEY"
-            return [a, b]
+            return new AwsUserCredentials(a, b)
         }
 
         for( Path it : files ) {
@@ -129,12 +133,15 @@ class Global {
                 final token = section.aws_session_token
                 if( token ) {
                     log.debug "Using AWS temporary session credentials defined in `$profile` section in file: ${conf.file}"
-                    return [a,b,token]
+                    return new AwsSessionCredentials(a, b, token)
                 }
                 else {
                     log.debug "Using AWS credential defined in `$profile` section in file: ${conf.file}"
-                    return [a,b]
+                    return new AwsUserCredentials(a, b)
                 }
+            }
+            else if( (a=section.credential_process) ) {
+                return new AwsProcessCredentials(a)
             }
         }
 
@@ -156,7 +163,7 @@ class Global {
         return 'default'
     }
 
-    static List<String> getAwsCredentials(Map env, Map config) {
+    static getAwsCredentials(Map env, Map config) {
 
         def home = Paths.get(System.properties.get('user.home') as String)
         def files = [ home.resolve('.aws/credentials'), home.resolve('.aws/config') ]
@@ -195,11 +202,11 @@ class Global {
         return ini.section(profile).region
     }
 
-    static List<String> getAwsCredentials(Map env) {
+    static getAwsCredentials(Map env) {
         getAwsCredentials(env, config)
     }
 
-    static List<String> getAwsCredentials() {
+    static getAwsCredentials() {
         getAwsCredentials(SysEnv.get(), config)
     }
 

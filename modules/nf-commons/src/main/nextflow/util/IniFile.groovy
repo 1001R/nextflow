@@ -32,7 +32,7 @@ import groovy.transform.CompileStatic
 @CompileStatic
 class IniFile {
 
-    private Pattern fSection = Pattern.compile( "\\s*\\[([^]]*)\\]\\s*" );
+    private Pattern fSection = Pattern.compile( "\\s*\\[(?:profile\\s+)?(.*?)\\]\\s*" );
     private Pattern fKeyValue = Pattern.compile( "\\s*([^=]*)=(.*)" );
     private Map<String, Map<String, String>> fEntries = new HashMap<>();
 
