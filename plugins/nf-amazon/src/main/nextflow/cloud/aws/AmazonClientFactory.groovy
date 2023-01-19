@@ -17,10 +17,7 @@
 
 package nextflow.cloud.aws
 
-import com.amazonaws.auth.AWSCredentials
-import com.amazonaws.auth.AWSStaticCredentialsProvider
-import com.amazonaws.auth.BasicAWSCredentials
-import com.amazonaws.auth.BasicSessionCredentials
+import com.amazonaws.auth.AWSCredentialsProvider
 import com.amazonaws.regions.Region
 import com.amazonaws.regions.RegionUtils
 import com.amazonaws.services.batch.AWSBatchClient
@@ -34,6 +31,9 @@ import groovy.transform.Memoized
 import groovy.util.logging.Slf4j
 import nextflow.Global
 import nextflow.exception.AbortOperationException
+import nextflow.util.AwsSessionCredentials
+import nextflow.util.AwsUserCredentials
+
 /**
  *
  * @author Paolo Di Tommaso <paolo.ditommaso@gmail.com>
@@ -48,39 +48,12 @@ class AmazonClientFactory {
     private AmazonEC2Client ec2Client
 
     /**
-     * The AWS access key credentials (optional)
-     */
-    private String accessKey
-
-    /**
-     * The AWS secret key credentials (optional)
-     */
-    private String secretKey
-
-    /**
-     * The AWS session key credentials (optional)
-     */
-    private String sessionToken
-
-    /**
      * The AWS region eg. {@code eu-west-1}. If it's not specified the current region is retrieved from
      * the EC2 instance metadata
      */
     private String region
 
-    /**
-     * @return The current set AWS access key
-     */
-    String getAccessKey() { accessKey }
-
-    /**
-     * @return The current set AWS secret key
-     */
-    String getSecretKey() { secretKey }
-
-
-    String getSessionToken() { sessionToken }
-
+    private AWSCredentialsProvider credentialsProvider
 
     /**
      * Initialise the Amazon cloud driver with default (empty) parameters
@@ -100,23 +73,20 @@ class AmazonClientFactory {
      */
     AmazonClientFactory(Map config) {
         // -- get the aws credentials
-        List credentials
+        def credentials
         if( config.accessKey && config.secretKey ) {
-            this.accessKey = config.accessKey
-            this.secretKey = config.secretKey
-            if (config.sessionToken){
-                this.sessionToken = config.sessionToken
-            }
+            String accessKey = config.accessKey
+            String secretKey = config.secretKey
+            String token = config.sessionToken
+            credentials = config.sessionToken
+                    ? new AwsSessionCredentials(accessKey, secretKey, token)
+                    : new AwsUserCredentials(accessKey, secretKey)
         }
-        else if( (credentials= Global.getAwsCredentials()) ) {
-            this.accessKey = credentials[0]
-            this.secretKey = credentials[1]
-            if (credentials.size() == 3){
-                this.sessionToken = credentials[2]
-            }
+        else {
+            credentials = Global.getAwsCredentials()
         }
 
-        if( !accessKey && !fetchIamRole() )
+        if( !credentials && !fetchIamRole() )
             throw new AbortOperationException("Missing AWS security credentials -- Provide access/security keys pair or define an IAM instance profile (suggested)")
 
         // -- get the aws default region
@@ -124,6 +94,7 @@ class AmazonClientFactory {
         if( !region )
             throw new AbortOperationException('Missing AWS region -- Make sure to define in your system environment the variable `AWS_DEFAULT_REGION`')
 
+        credentialsProvider = CredentialsProviderFactory.INSTANCE.createCredentialsProvider(credentials)
     }
 
     /**
@@ -209,11 +180,7 @@ class AmazonClientFactory {
         if( ec2Client )
             return ec2Client
 
-        def result = (accessKey && secretKey && sessionToken
-                ? new AmazonEC2Client(new BasicSessionCredentials(accessKey, secretKey, sessionToken))
-                : (accessKey && secretKey
-                ? new AmazonEC2Client(new BasicAWSCredentials(accessKey, secretKey))
-                : new AmazonEC2Client()))
+        def result = new AmazonEC2Client(credentialsProvider)
 
         if( region )
             result.setRegion(getRegionObj(region))
@@ -232,12 +199,7 @@ class AmazonClientFactory {
      */
     @Memoized
     AWSBatchClient getBatchClient() {
-        def result = (accessKey && secretKey && sessionToken
-                ? new AWSBatchClient(new BasicSessionCredentials(accessKey, secretKey, sessionToken))
-                : (accessKey && secretKey
-                ? new AWSBatchClient(new BasicAWSCredentials(accessKey, secretKey))
-                : new AWSBatchClient()))
-
+        AWSBatchClient result = new AWSBatchClient(credentialsProvider)
         if( region )
             result.setRegion(getRegionObj(region))
 
@@ -247,13 +209,10 @@ class AmazonClientFactory {
     @Memoized
     AmazonECS getEcsClient() {
 
-        final clientBuilder = AmazonECSClientBuilder .standard()
+        final clientBuilder = AmazonECSClientBuilder.standard()
+            .withCredentials(credentialsProvider)
         if( region )
             clientBuilder.withRegion(region)
-
-        final credentials = getCredentialsProvider0()
-        if( credentials )
-            clientBuilder.withCredentials(credentials)
 
         clientBuilder.build()
     }
@@ -265,29 +224,9 @@ class AmazonClientFactory {
         if( region )
             clientBuilder.withRegion(region)
 
-        final credentials = getCredentialsProvider0()
-        if( credentials )
-            clientBuilder.withCredentials(credentials)
+        clientBuilder.withCredentials(credentialsProvider)
 
         return clientBuilder.build()
     }
-
-    protected AWSCredentials getCredentials0() {
-        if( !accessKey || !secretKey ) {
-            return null
-        }
-
-        if( sessionToken )
-            new BasicSessionCredentials(accessKey, secretKey, sessionToken)
-        else
-            new BasicAWSCredentials(accessKey, secretKey)
-    }
-
-    protected AWSStaticCredentialsProvider getCredentialsProvider0() {
-        final creds = getCredentials0()
-        if( !creds ) return null
-        return new AWSStaticCredentialsProvider(creds)
-    }
-
 
 }

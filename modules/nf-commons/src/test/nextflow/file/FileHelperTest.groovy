@@ -323,8 +323,8 @@ class FileHelperTest extends Specification {
 
         expect:
         // properties have priority over the environment map
-        FileHelper.envFor0('s3', env).access_key == 'a1'
-        FileHelper.envFor0('s3', env).secret_key == 's1'
+        FileHelper.envFor0('s3', env).credentials.accessKeyId == 'a1'
+        FileHelper.envFor0('s3', env).credentials.secretAccessKey == 's1'
 
         // any other return just the session
         FileHelper.envFor0('dx', env).session == sess

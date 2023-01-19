@@ -60,8 +60,7 @@ import java.util.concurrent.Future;
 
 import com.amazonaws.AmazonClientException;
 import com.amazonaws.ClientConfiguration;
-import com.amazonaws.auth.AWSCredentials;
-import com.amazonaws.auth.AWSStaticCredentialsProvider;
+import com.amazonaws.auth.AWSCredentialsProvider;
 import com.amazonaws.regions.Region;
 import com.amazonaws.regions.RegionUtils;
 import com.amazonaws.services.s3.AmazonS3;
@@ -135,10 +134,10 @@ public class AmazonS3Client {
 		this.client = client;
 	}
 
-	public AmazonS3Client(ClientConfiguration config, AWSCredentials creds, String region) {
+	public AmazonS3Client(ClientConfiguration config, AWSCredentialsProvider creds, String region) {
 		this.client = AmazonS3ClientBuilder
 				.standard()
-				.withCredentials(new AWSStaticCredentialsProvider(creds))
+				.withCredentials(creds)
 				.withClientConfiguration(config)
 				.withRegion( region )
 				.build();
