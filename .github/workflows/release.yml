@@ -1,0 +1,31 @@
+on:
+  release:
+    types: [created]
+name: Nextflow Release
+jobs:
+  release:
+    name: Create release-artifacts
+    runs-on: ubuntu-latest
+    permissions: write-all
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 1
+          submodules: true
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          java-version: 17
+          distribution: adopt
+          architecture: x64
+          cache: gradle
+      - name: Package
+        run: make pack
+      - name: Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag=$(jq -r .release.tag_name "$GITHUB_EVENT_PATH")
+          gh release upload "$tag" build/releases/nextflow-*-all
+
